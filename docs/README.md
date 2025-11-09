@@ -164,6 +164,7 @@ git log --oneline -5
 ### Understanding the Architecture Shift
 
 In your previous Flask PWA, everything ran in one application:
+
 - `main.py` handled both database queries AND served web pages
 - This works fine for small projects, but has limitations:
   - Hard to reuse data in other applications
@@ -171,12 +172,14 @@ In your previous Flask PWA, everything ran in one application:
   - Difficult to update frontend without touching backend
 
 **The API Architecture:**
+
 - **API Server** (`api.py` on port 3000): Manages data & database
 - **PWA Server** (`main.py` on port 5000): Serves web pages & handles user interface
 - They communicate using HTTP requests (like talking over the internet)
 
 **Real-World Analogy:**
 Think of a restaurant:
+
 - Kitchen (API) = Prepares food (data)
 - Dining room (PWA) = Where customers interact
 - Waiters (HTTP requests) = Carry orders and food between them
@@ -246,6 +249,7 @@ This Python implementation in 'api.py':
 **Understanding CORS - Cross-Origin Resource Sharing:**
 
 By default, browsers block requests between different "origins" (different ports/domains) for security.
+
 - Your PWA runs on `http://localhost:5000`
 - Your API runs on `http://localhost:3000`
 - These are different origins!
@@ -254,6 +258,7 @@ By default, browsers block requests between different "origins" (different ports
 Without CORS, when your PWA tries to request data from the API, the browser will block it saying: "These are different servers, this might be dangerous!"
 
 **The CORS Configuration:**
+
 - `CORS(api)` = "Allow requests from other origins"
 - `CORS_HEADERS` = "Allow Content-Type header" (needed for JSON)
 
@@ -264,11 +269,13 @@ Without CORS, when your PWA tries to request data from the API, the browser will
 Rate limiting protects your API from abuse by limiting how many requests each user can make.
 
 **Without Rate Limiting:**
+
 - Someone could write a script to call your API millions of times
 - This could crash your server or fill your database with junk
 - Called a "Denial of Service" (DoS) attack
 
 **How This Configuration Works:**
+
 - `default_limits`: Everyone gets max 200 requests/day, 50/hour
 - `@limiter.limit("3/second")`: This specific endpoint allows only 3 requests per second
 - `get_remote_address`: Tracks limits per IP address
@@ -334,7 +341,7 @@ python api.py
 ```
 
 > **API not starting?** Check that Flask, flask_cors, and flask_limiter are installed: `pip list | grep -i flask`
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - API Server Issues](#-troubleshooting-common-issues)
 
 ---
@@ -345,22 +352,24 @@ Every API response includes a status code that tells the client what happened.
 
 **Common Status Codes You'll Use:**
 
-| Code | Name | Meaning | When to Use |
-|------|------|---------|-------------|
-| 200 | OK | Request succeeded | GET requests that return data |
-| 201 | Created | New resource created | POST requests that add to database |
-| 400 | Bad Request | Client sent invalid data | JSON validation fails |
-| 401 | Unauthorised | Missing/invalid authentication | Wrong API key |
-| 404 | Not Found | Resource doesn't exist | URL endpoint not found |
-| 429 | Too Many Requests | Rate limit exceeded | User hits rate limit |
-| 500 | Internal Server Error | Server crashed | Your code has a bug |
+| Code | Name                  | Meaning                        | When to Use                        |
+| ---- | --------------------- | ------------------------------ | ---------------------------------- |
+| 200  | OK                    | Request succeeded              | GET requests that return data      |
+| 201  | Created               | New resource created           | POST requests that add to database |
+| 400  | Bad Request           | Client sent invalid data       | JSON validation fails              |
+| 401  | Unauthorised          | Missing/invalid authentication | Wrong API key                      |
+| 404  | Not Found             | Resource doesn't exist         | URL endpoint not found             |
+| 429  | Too Many Requests     | Rate limit exceeded            | User hits rate limit               |
+| 500  | Internal Server Error | Server crashed                 | Your code has a bug                |
 
 **Why They Matter:**
+
 - Allows client (PWA) to handle different situations appropriately
 - Standard way for all web services to communicate success/failure
 - Makes debugging easier (specific error codes)
 
 **Example:**
+
 ```python
 return ("API Works"), 200  # Tell client: "Success! Here's your data"
 return {"error": "Invalid JSON"}, 400  # Tell client: "You sent bad data"
@@ -371,17 +380,50 @@ return {"error": "Unauthorised"}, 401  # Tell client: "You're not allowed"
 
 ### Step 4: Build a basic GET response
 
-**Understanding jsonify() in APIs:**
+**Understanding `with` Context Managers for Databases:**
+
+In programming, we often need to manage resources, like files or database connections. A common pattern is "open, do something, close."
+
+**The Old Way (Manual `con.close()`):**
+
+```python
+con = sql.connect("database/data_source.db")
+# ... do database work ...
+con.close()
+```
+
+This works, but what if an error happens before `con.close()` is called? The connection might be left open, which can cause problems like locking the database file.
+
+**The Better Way (Using `with`):**
+Python's `with` statement simplifies resource management. It automatically handles the setup and teardown, even if errors occur.
+
+```python
+with sql.connect("database/data_source.db") as con:
+    # ... do database work ...
+# The connection is automatically closed here!
+```
+
+**Why is `with` better?**
+
+- **Safer:** It guarantees the database connection is closed, preventing resource leaks.
+- **Cleaner:** The code is more readable and you don't have to remember to call `con.close()`.
+- **Modern:** It's the standard, recommended way to work with resources in Python.
+
+Think of it like borrowing a book from a library. The `with` statement is like a librarian who automatically checks the book back in for you when you leave, no matter what.
+
+**Understanding `jsonify()` in APIs:**
 
 In your previous PWA, you returned Python data directly to Jinja2 templates. In an API, you must return JSON text for HTTP responses.
 
-**Without jsonify:**
+**Without `jsonify`:**
+
 ```python
 return {"name": "test"}
 # Response: Python object (only works within Python)
 ```
 
-**With jsonify:**
+**With `jsonify`:**
+
 ```python
 return jsonify({"name": "test"})
 # Response: '{"name": "test"}' (JSON text string)
@@ -391,12 +433,12 @@ return jsonify({"name": "test"})
 
 **What's the Difference?**
 
-| Aspect | Python Dict | JSON String (via jsonify) |
-|--------|-------------|---------------------------|
-| Data Type | `dict` object | Text string |
-| Use | Within Python | Over HTTP/network |
-| Format | Python-specific | Universal standard |
-| Headers | None | Content-Type: application/json |
+| Aspect    | Python Dict     | JSON String (via `jsonify`)      |
+| --------- | --------------- | -------------------------------- |
+| Data Type | `dict` object   | Text string                      |
+| Use       | Within Python   | Over HTTP/network                |
+| Format    | Python-specific | Universal standard               |
+| Headers   | None            | `Content-Type: application/json` |
 
 Extend the `get():` method in `api.py` to get data from the database via the `dbHandler` and return it to the request with a status `200`.
 
@@ -409,10 +451,10 @@ def get():
 This Python implementation in 'database_manager.py'
 
 1. Imports all the required dependencies for the project
-2. Connects to the SQLite3 database
-3. Executes a query
-4. Converts the query data to a JSON structure
-5. Returns the JSON data
+2. Connects to the SQLite3 database using a `with` context manager.
+3. Executes a query.
+4. Converts the query data to a JSON structure.
+5. Returns the JSON data.
 
 **Why Build Dictionaries from Rows?**
 
@@ -431,6 +473,7 @@ migrate_data = [
 ```
 
 **Why?**
+
 - **Self-documenting**: JSON keys show what each value means
 - **Order-independent**: Can access `data["name"]` instead of `data[1]`
 - **Flexible**: Can add/remove fields without breaking client code
@@ -443,20 +486,20 @@ from flask import current_app
 
 
 def extension_get(lang):
-    con = sql.connect("database/data_source.db")
-    cur = con.cursor()
-    cur.execute("SELECT * FROM extension")
-    migrate_data = [
-        dict(
-            extID=row[0],
-            name=row[1],
-            hyperlink=row[2],
-            about=row[3],
-            image=row[4],
-            language=row[5],
-        )
-        for row in cur.fetchall()
-    ]
+    with sql.connect("database/data_source.db") as con:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM extension WHERE language LIKE ?;", [lang])
+        migrate_data = [
+            dict(
+                extID=row[0],
+                name=row[1],
+                hyperlink=row[2],
+                about=row[3],
+                image=row[4],
+                language=row[5],
+            )
+            for row in cur.fetchall()
+        ]
     return jsonify(migrate_data)
 ```
 
@@ -477,7 +520,7 @@ def extension_get(lang):
 ```
 
 > **No data returning?** Check that database_manager.py is in the same directory and data_source.db exists in the database folder.
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - Database Connection Issues](#-troubleshooting-common-issues)
 
 ---
@@ -489,12 +532,14 @@ def extension_get(lang):
 Query parameters are data sent in the URL after a `?` symbol. They're perfect for filtering, searching, and sorting.
 
 **Example:**
+
 ```
 http://127.0.0.1:3000?lang=python
                       └─ Query parameter: lang=python
 ```
 
 **Use Query Parameters for:**
+
 - Filtering data (search, sort, filter)
 - Data visible in URL
 - GET requests
@@ -529,20 +574,20 @@ Extend the database query in the `extension_get():` method in the `database_mana
 
 ```python
 def extension_get(lang):
-    con = sql.connect("database/data_source.db")
-    cur = con.cursor()
-    cur.execute("SELECT * FROM extension WHERE language LIKE ?;", [lang])
-    migrate_data = [
-        dict(
-            extID=row[0],
-            name=row[1],
-            hyperlink=row[2],
-            about=row[3],
-            image=row[4],
-            language=row[5],
-        )
-        for row in cur.fetchall()
-    ]
+    with sql.connect("database/data_source.db") as con:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM extension WHERE language LIKE ?;", [lang])
+        migrate_data = [
+            dict(
+                extID=row[0],
+                name=row[1],
+                hyperlink=row[2],
+                about=row[3],
+                image=row[4],
+                language=row[5],
+            )
+            for row in cur.fetchall()
+        ]
     return jsonify(migrate_data)
 ```
 
@@ -567,7 +612,7 @@ def extension_get(lang):
 ```
 
 > **Filtering not working?** Check that your language values in the database match the ENUM values (uppercase: PYTHON, CPP, BASH, etc.)
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - Query Parameter Issues](#-troubleshooting-common-issues)
 
 ---
@@ -608,7 +653,7 @@ def extension_add(response):
 ```
 
 > **POST not working?** Ensure you set Content-Type to "application/json" in Thunder Client headers.
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - POST Request Issues](#-troubleshooting-common-issues)
 
 ---
@@ -618,6 +663,7 @@ def extension_add(response):
 **Understanding JSON Schema Validation:**
 
 In your previous PWA, you trusted user input and inserted it directly into the database. **This is dangerous!** Users could:
+
 - Send malicious code (XSS attacks)
 - Send wrong data types that crash your app
 - Send extra fields you don't expect
@@ -668,8 +714,11 @@ Let's break down the regex pattern piece by piece:
 
 **Why Block < and >?**
 These characters can inject HTML/JavaScript:
+
 ```html
-<script>alert('hacked!')</script>
+<script>
+  alert("hacked!");
+</script>
 ```
 
 **Testing Your Patterns:**
@@ -755,7 +804,7 @@ Sample JSON data for you to test the API:
 ```
 
 > **Validation always passing?** Check that jsonschema is installed: `pip install jsonschema`
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - JSON Validation Issues](#-troubleshooting-common-issues)
 
 ---
@@ -767,22 +816,22 @@ Update the `extension_add():` method in database_manager.py to INSERT the JSON d
 ```python
 def extension_add(data):
     if validate_json(data):
-        con = sql.connect("database/data_source.db")
-        cur = con.cursor()
-        cur.execute(
-            "INSERT INTO extension (name, hyperlink, about, image, language) VALUES (?, ?, ?, ?, ?);",
-            [
-                data["name"],
-                data["hyperlink"],
-                data["about"],
-                data["image"],
-                data["language"],
-            ],
-        )
-        con.commit()
-        con.close()
-        return {"message": "Extension added successfully"}, 201
+        with sql.connect("database/data_source.db") as con:
+            cur = con.cursor()
+            cur.execute(
+                "INSERT INTO extension (name, hyperlink, about, image, language) VALUES (?, ?, ?, ?, ?);",
+                [
+                    data["name"],
+                    data["hyperlink"],
+                    data["about"],
+                    data["image"],
+                    data["language"],
+                ],
+            )
+            con.commit()
+        return jsonify({"message": "Extension added successfully"}), 201
     else:
+        return jsonify({"error": "Invalid JSON"}), 400
         return {"error": "Invalid JSON"}, 400
 ```
 
@@ -801,7 +850,7 @@ def extension_add(data):
 ```
 
 > **Data not saving?** Check database file permissions and that the connection path is correct: `database/data_source.db`
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - Database Insert Issues](#-troubleshooting-common-issues)
 
 ---
@@ -814,13 +863,14 @@ Currently, ANYONE can POST data to your API and add extensions to your database!
 
 **Authentication Types:**
 
-| Type | Description | Use Case |
-|------|-------------|----------|
-| **API Key** (We use this) | Shared secret string | App-to-app communication |
-| **User Auth** (OAuth, JWT) | Individual user credentials | User-specific data |
-| **No Auth** | Public access | Read-only public data |
+| Type                       | Description                 | Use Case                 |
+| -------------------------- | --------------------------- | ------------------------ |
+| **API Key** (We use this)  | Shared secret string        | App-to-app communication |
+| **User Auth** (OAuth, JWT) | Individual user credentials | User-specific data       |
+| **No Auth**                | Public access               | Read-only public data    |
 
 **Why API Keys for This Project?**
+
 - We're not authenticating individual users
 - We're authenticating the PWA application itself
 - Only authorized applications can add extensions
@@ -828,6 +878,7 @@ Currently, ANYONE can POST data to your API and add extensions to your database!
 **How It Works:**
 
 1. **Server side (api.py):**
+
 ```python
 auth_key = "4L50v92nOgcDCYUM"  # Secret key (like a password)
 
@@ -838,6 +889,7 @@ else:
 ```
 
 2. **Client side (main.py) - coming later:**
+
 ```python
 app_header = {"Authorisation": "4L50v92nOgcDCYUM"}  # Include key in request
 
@@ -849,6 +901,7 @@ response = requests.post(
 ```
 
 **Security Considerations:**
+
 - ⚠️ **NEVER commit API keys to GitHub** (use environment variables in production)
 - ⚠️ **NEVER expose API keys in client-side JavaScript** (they're in main.py server-side only)
 - ⚠️ **Use HTTPS in production** (or keys can be intercepted)
@@ -856,6 +909,7 @@ response = requests.post(
 
 **Analogy:**
 API key = Building access card
+
 - Only people with the card can enter
 - If card is stolen, change the lock code
 
@@ -905,7 +959,7 @@ def post():
 ```
 
 > **Authentication not blocking requests?** Check the header name is exactly "Authorisation" (not "Authorization") to match the code.
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - Authentication Issues](#-troubleshooting-common-issues)
 
 ---
@@ -1262,7 +1316,7 @@ python main.py
 ```
 
 > **PWA not loading?** Check that Flask, flask_wtf, flask_csp, and requests are installed: `pip list | grep -i flask`
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - Flask Application Issues](#-troubleshooting-common-issues)
 
 ---
@@ -1317,7 +1371,7 @@ Ensure your page renders correctly with the test cases:
 ```
 
 > **Search not highlighting?** Check that app.js is properly linked in layout.html and the highlight CSS class exists in style.css.
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - JavaScript Issues](#-troubleshooting-common-issues)
 
 ---
@@ -1348,21 +1402,23 @@ def index():
 
 **What Changed?**
 
-| Previous Approach | API Approach |
-|------------------|--------------|
-| Direct function call | HTTP request over network |
-| Instant response | Network delay (milliseconds) |
-| Python data structures | JSON text format |
-| No authentication needed | API key required |
-| Tight coupling | Loose coupling |
+| Previous Approach        | API Approach                 |
+| ------------------------ | ---------------------------- |
+| Direct function call     | HTTP request over network    |
+| Instant response         | Network delay (milliseconds) |
+| Python data structures   | JSON text format             |
+| No authentication needed | API key required             |
+| Tight coupling           | Loose coupling               |
 
 **Why Use requests Library?**
+
 - `requests.get()` = Send HTTP GET request (retrieve data)
 - `requests.post()` = Send HTTP POST request (send data)
 - `.json()` = Parse JSON text into Python dictionary
 - `.raise_for_status()` = Raise exception if error status code
 
 **Error Handling is Now Critical:**
+
 ```python
 try:
     response = requests.get(url)
@@ -1374,6 +1430,7 @@ except requests.exceptions.RequestException as e:
 ```
 
 **What Could Go Wrong?**
+
 - API server not running
 - Network connection lost
 - API returns error status
@@ -1484,7 +1541,7 @@ Replace the test html in 'index.html` template that:
 ```
 
 > **No data showing?** Check both servers are running and the API URL in main.py is correct: `http://127.0.0.1:3000`
-> 
+>
 > **Having issues?** See [🔧 Troubleshooting - API Integration Issues](#-troubleshooting-common-issues)
 
 ---
@@ -1494,23 +1551,27 @@ Replace the test html in 'index.html` template that:
 **IMPORTANT: This project requires TWO servers running at the same time!**
 
 **Terminal 1 - API Server:**
+
 ```bash
 python api.py
 # Running on http://127.0.0.1:3000
 ```
 
 **Terminal 2 - PWA Server:**
+
 ```bash
 python main.py
 # Running on http://127.0.0.1:5000
 ```
 
 **Why Two Servers?**
+
 - **API (port 3000)**: Manages data & database
 - **PWA (port 5000)**: Serves web pages to users
 - PWA makes HTTP requests to API to get/send data
 
 **Communication Flow:**
+
 ```
 User Browser (localhost:5000)
     ↓ Views web page
@@ -1528,12 +1589,14 @@ User Browser
 ```
 
 **Testing Checklist:**
+
 1. ✅ Start API server (Terminal 1): `python api.py`
 2. ✅ Test API directly: Visit `http://localhost:3000` → Should see JSON
 3. ✅ Start PWA server (Terminal 2): `python main.py`
 4. ✅ Test PWA: Visit `http://localhost:5000` → Should see web page with data
 
 **Troubleshooting:**
+
 - If PWA shows "Failed to retrieve data from API" → API server not running
 - If you see "Address already in use" → Server already running, kill it first
 
@@ -1544,6 +1607,7 @@ User Browser
 **Understanding Request Data: Form Data vs JSON:**
 
 **Form Data (HTML forms):**
+
 ```python
 # Client-side (HTML form):
 <form method="POST">
@@ -1555,12 +1619,14 @@ email = request.form["email"]  # Gets "user@example.com" from form
 ```
 
 **Use for:**
+
 - Submitting new data from HTML forms
 - Sensitive data (passwords)
 - POST requests
 - Large amounts of data
 
 **JSON Data (API communication):**
+
 ```python
 # Client-side (PWA):
 data = {"name": "test", "language": "PYTHON"}
@@ -1572,6 +1638,7 @@ name = data["name"]  # Access by key
 ```
 
 **Use for:**
+
 - API communication
 - Complex structured data
 - App-to-app communication
@@ -1798,7 +1865,8 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(message)s",
 ```
-```
+
+````
 
 ### 15: Configure the logger to log to main_security_log.log
 
@@ -1812,13 +1880,13 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(message)s",
 )
-```
+````
 
 #### ✅ Checkpoint: Project Complete!
 
 ```bash
 # Final verification checklist:
-# 
+#
 # API (port 3000):
 # ✅ GET all extensions works
 # ✅ GET filtered by language works
@@ -2081,6 +2149,7 @@ except sqlite3.IntegrityError:
 #### **Problem: Header spelling confusion**
 
 **Note**: The code uses British spelling "Authorisation" - this is intentional and must match exactly in:
+
 - api.py: `request.headers.get("Authorisation")`
 - main.py: `app_header = {"Authorisation": "..."}`
 - Thunder Client: Header name must be `Authorisation`
@@ -2095,9 +2164,11 @@ except sqlite3.IntegrityError:
 1. Check you're in the correct directory: `pwd`
 2. Verify main.py exists: `ls -la`
 3. Check all required packages are installed:
+
 ```bash
 pip install Flask flask_wtf flask_csp requests
 ```
+
 4. Verify imports at top of main.py
 
 #### **Problem: "Address already in use" on port 5000**
@@ -2203,6 +2274,7 @@ app.run(debug=True, host='0.0.0.0', port=5001)
 **Solution**:
 
 Use curl instead:
+
 ```bash
 # GET request:
 curl http://localhost:3000
@@ -2274,16 +2346,16 @@ If you're still stuck after trying these solutions:
 
 ### Common Error Message Patterns
 
-| Error Pattern | Likely Cause | Solution Section |
-|--------------|--------------|------------------|
-| `ModuleNotFoundError` | Missing Python package | API Server Issues |
-| `Address already in use` | Port conflict | API/Flask Application Issues |
-| `sqlite3.OperationalError` | Database problem | Database Connection Issues |
-| `CORS policy` | Cross-origin blocked | API Server Issues |
-| `401 Unauthorised` | Auth problem | Authentication Issues |
-| `400 Bad Request` | Invalid data | JSON Validation Issues |
-| `TemplateNotFound` | Missing HTML file | Flask Application Issues |
-| `Failed to retrieve data` | API communication | API Integration Issues |
+| Error Pattern              | Likely Cause           | Solution Section             |
+| -------------------------- | ---------------------- | ---------------------------- |
+| `ModuleNotFoundError`      | Missing Python package | API Server Issues            |
+| `Address already in use`   | Port conflict          | API/Flask Application Issues |
+| `sqlite3.OperationalError` | Database problem       | Database Connection Issues   |
+| `CORS policy`              | Cross-origin blocked   | API Server Issues            |
+| `401 Unauthorised`         | Auth problem           | Authentication Issues        |
+| `400 Bad Request`          | Invalid data           | JSON Validation Issues       |
+| `TemplateNotFound`         | Missing HTML file      | Flask Application Issues     |
+| `Failed to retrieve data`  | API communication      | API Integration Issues       |
 
 ---
 
