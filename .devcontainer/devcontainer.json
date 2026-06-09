@@ -1,15 +1,12 @@
 {
-  "name": "Python Flask Development Container",
-  "image": "mcr.microsoft.com/devcontainers/python:0-3.13-bookworm",
-  "features": {
-    "ghcr.io/devcontainers-contrib/features/coverage-py:2": {}
-  },
+"name": "Python Flask Development Container",
+  "image": "mcr.microsoft.com/devcontainers/python:0-3.12-bookworm",
   "hostRequirements": {
     "cpus": 4
   },
-  "waitFor": "onCreateCommand",
+  "waitFor": "postCreateCommand",
   "updateContentCommand": "",
-  "postCreateCommand": "pip install -r requirements.txt && apt-get clean && rm -rf /root/.cache/pip",
+  "postCreateCommand": "apk add --no-cache python3 py3-pip sqlite && python3 -m pip install --no-cache-dir -r requirements.txt",
   "postStartCommand": "", // For commands to run each Codespace start
   "customizations": {
     "vscode": {
