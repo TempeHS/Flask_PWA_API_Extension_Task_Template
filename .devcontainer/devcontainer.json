@@ -6,7 +6,7 @@
   },
   "waitFor": "postCreateCommand",
   "updateContentCommand": "",
-  "postCreateCommand": "apk add --no-cache python3 py3-pip sqlite && python3 -m pip install --no-cache-dir -r requirements.txt",
+  "postCreateCommand": "pip3 install --no-cache-dir -r requirements.txt",
   "postStartCommand": "", // For commands to run each Codespace start
   "customizations": {
     "vscode": {
